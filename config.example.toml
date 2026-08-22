@@ -1,0 +1,32 @@
+# git-ai-commit configuration.
+# Location: ~/.config/git-ai-commit/config.toml
+# Precedence: environment variable (GIT_AI_*) > this file > built-in default.
+# See docs/adr/0010-config-env-and-file.md (ADR-0010).
+
+[daemon]
+# Path to the GGUF model (llama-server reads this via the launcher script).
+# model_path = "/home/you/.cache/git-ai-commit/some-model-Q4_K_M.gguf"
+
+# OpenAI-compatible endpoint (ADR-0003).
+# llama_url = "http://127.0.0.1:8080/v1/completions"
+
+# Debounce window in milliseconds (rule 15). Tune after benchmarking.
+# debounce_ms = 250
+
+# Trigger strategy: space (default) | keystroke | manual (ADR-0006).
+# trigger = "space"
+
+# Socket path (ADR-0002/0005). Defaults to XDG_RUNTIME_DIR/daemon.sock.
+# socket_path = "/run/user/$UID/git-ai-commit/daemon.sock"
+
+# Diff tuning (ADR-0008).
+# diff_max_chars = 4000
+# diff_cache_ttl = 300.0
+
+# Inference tuning (ADR-0009).
+# max_tokens = 48
+# temperature = 0.2
+
+[zsh]
+# Style for the ghost text (rule 5).
+# highlight_style = "fg=244"

@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Tests / tooling
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Runtime artifacts (never commit these)
+/tmp_sock/
+*.sock
+*.log
+
+# Local model files (too large to commit)
+*.gguf
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
