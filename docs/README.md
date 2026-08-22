@@ -102,3 +102,9 @@ The ADRs in [`adr/`](adr/README.md) record every decision and the
 source it implements or corrects. **Rule: code must not silently
 contradict an ADR.** If code and an ADR disagree, it's a bug in the
 code (or a deliberate change requiring a new superseding ADR).
+
+> **Note on the daemon language:** ADR-0013 records the decision to keep
+> the daemon in Python (rejecting Rust/Go migration), grounded in a
+> 2026 re-verification of the competing proposals' claims — including
+> that PyOxidizer is abandoned and that "uvloop lacks macOS support"
+> is false but that uvloop is unnecessary for this I/O-bound proxy.

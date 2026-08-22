@@ -33,6 +33,7 @@ corrects or implements.
 | [ADR-0010](0010-config-env-and-file.md) | Configuration via environment + TOML config file | ACCEPTED | - |
 | [ADR-0011](0011-zpty-selftest-degrade.md) | `zpty` self-test at load; graceful degradation | ACCEPTED | - |
 | [ADR-0012](0012-json-ipc-newline-delimited.md) | Newline-delimited JSON IPC contract | ACCEPTED | - |
+| [ADR-0013](0013-keep-python-daemon.md) | Keep the daemon in Python; reject Rust/Go migration (2026 verified) | ACCEPTED | refines 0002 |
 
 ## Decision timeline
 
@@ -49,4 +50,5 @@ ADR-0009 (prompt)            ─────────────────
 ADR-0010 (config)            ────────────────────────────────────┤
 ADR-0011 (zpty selftest)     ────────────────────────────────────┤
 ADR-0012 (IPC contract)      ────────────────────────────────────┘
+ADR-0013 (keep Python)       ─ conclusion of the daemon-language review
 ```
