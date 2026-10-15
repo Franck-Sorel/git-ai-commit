@@ -40,8 +40,25 @@ see [`docs/README.md`](docs/README.md) and the ADRs in
 
 ## Install
 
+### Option A — Zsh plugin manager (recommended, oh-my-zsh / zgen / antigen / zim)
+
+Clone the repo anywhere and enable it by name. Most managers look for
+`git-ai-commit.plugin.zsh` at the repo root:
+
 ```sh
-# 1. Install Python deps
+# oh-my-zsh example
+git clone https://github.com/Franck-Sorel/git-ai-commit ~/.oh-my-zsh/custom/plugins/git-ai-commit
+# then add `git-ai-commit` to plugins=(...) in ~/.zshrc
+```
+
+The plugin **auto-starts the daemon** on the first zsh load (unless
+`GIT_AI_AUTOSTART=0`), so you don't need a separate manual step. You still
+need a running `llama-server` and a model for suggestions to appear.
+
+### Option B — manual `source`
+
+```sh
+# 1. Install Python deps (the plugin can also run from source via PYTHONPATH)
 pip install -e .
 
 # 2. Get a model (or set GIT_AI_MODEL_URL to any .gguf you prefer)
@@ -53,13 +70,23 @@ GIT_AI_MODEL_URL="<url-to-a-small-instruct-model.gguf>" ./scripts/download-model
 # 4. Start the LLM server (one terminal)
 GIT_AI_MODEL_PATH="$HOME/.cache/git-ai-commit/<model>.gguf" ./bin/llama-server.sh
 
-# 5. Start the daemon (another terminal)
-python -m git_ai_commit.daemon
-
-# 6. Open a new zsh, stage some changes, and type:
+# 5. Open a new zsh, stage some changes, and type:
 git commit -m "feat(auth): add "
 #          Ghost text appears.  Press Tab to accept.
 ```
+
+The daemon is started automatically on load. To manage it yourself instead,
+set `GIT_AI_AUTOSTART=0` and run `python -m git_ai_commit.daemon` in a
+terminal.
+
+### Not working? Diagnose in one command
+
+```sh
+./scripts/doctor.sh
+```
+
+Checks every link (zsh/zpty, python+aiohttp, daemon socket, worker round
+trip, llama-server) and tells you which one to fix.
 
 ## Usage
 
@@ -85,6 +112,8 @@ Env prefix `GIT_AI_`. Common settings:
 | `GIT_AI_TRIGGER` | `space` | `space` \| `keystroke` \| `manual` |
 | `GIT_AI_DEBOUNCE_MS` | `250` | debounce window |
 | `GIT_AI_SOCKET_PATH` | XDG `/tmp/git-ai-commit-UID/daemon.sock` | daemon socket |
+| `GIT_AI_AUTOSTART` | `1` | `0` disables lazy daemon auto-start |
+| `GIT_AI_PYTHON` | auto | explicit python for daemon/worker |
 | `GIT_AI_HIGHLIGHT_STYLE` | `fg=244` | ghost-text style |
 | `GIT_AI_CTX_SIZE` | `4096` | model context (llama-server) |
 | `GIT_AI_PARALLEL` | `4` | concurrent slots (llama-server) |
@@ -92,9 +121,19 @@ Env prefix `GIT_AI_`. Common settings:
 ## Test
 
 ```sh
+make test          # everything below
 pytest -q          # daemon unit tests (no llama-server needed; uses a mock)
-zsh tests/smoke.zsh   # plugin load + context-detection smoke test
+zsh -f tests/smoke.zsh   # plugin load + context-detection smoke test
+zsh tests/interactive.zsh # plugin load in a real ZLE (pytest + zpty)
+bash tests/e2e-workflow.sh # cross-env: plugin-manager load, ZLE, real daemon+worker vs mock LLM, auto-start
+bash tests/integration.sh  # real daemon + worker vs mock LLM
 ```
+
+### CI on GitHub
+
+All of the above run automatically on **GitHub Actions** (see
+`.github/workflows/ci.yml`) across Linux (Ubuntu) and macOS, and on Python
+3.10/3.11/3.12 — so every PR is verified end-to-end before merge.
 
 ## Docs / design baseline
 

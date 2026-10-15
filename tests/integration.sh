@@ -13,14 +13,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PY="${PYTHON:-${ROOT}/.venv/bin/python}"
 if [[ ! -x "$PY" ]]; then PY=python3; fi
-sockdir="$(mktemp -d)"
 LLM_PORT="${LLM_PORT:-8099}"
-SOCK_PATH="$sockdir/daemon.sock"
+# macOS caps AF_UNIX paths at ~104 bytes; mktemp -d lives under the long
+# /var/folders/... tree, so keep the socket short and in the temp root.
+SOCK_PATH="${GIT_AI_SOCKET_PATH:-${TMPDIR:-/tmp}/gai-it-$$.sock}"
 
 pids=()
 cleanup() {
   for pid in "${pids[@]:-}"; do kill "$pid" 2>/dev/null || true; done
-  rm -rf "$sockdir"
+  rm -f "$SOCK_PATH"
 }
 trap cleanup EXIT
 
@@ -49,7 +50,10 @@ echo "$RESP" | grep -q '"status": "ok"' || { echo "FAIL: no ok status"; exit 1; 
 echo "$RESP" | grep -q 'login validation' || { echo "FAIL: unexpected suggestion"; exit 1; }
 
 echo "== security: socket permissions are 0600"
-perm="$(stat -c '%a' "$SOCK_PATH")"
+case "$(uname -s)" in
+  Darwin) perm="$(stat -f '%Lp' "$SOCK_PATH")" ;;
+  *)      perm="$(stat -c '%a' "$SOCK_PATH")" ;;
+esac
 [[ "$perm" == "600" || "$perm" == "0600" ]] || { echo "FAIL: socket perm $perm != 600"; exit 1; }
 echo "   socket perm: $perm"
 

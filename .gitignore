@@ -17,6 +17,7 @@ venv/
 /tmp_sock/
 *.sock
 *.log
+_gai_*.sock
 
 # Local model files (too large to commit)
 *.gguf
