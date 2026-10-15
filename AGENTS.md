@@ -73,10 +73,17 @@ override defaults. Env prefix `GIT_AI_` (e.g. `GIT_AI_MODEL_PATH`,
 
 - Install deps: `pip install -e .` (aiohttp)
 - Run daemon (dev): `python -m git_ai_commit.daemon`
-- Enable plugin: `scripts/apply-to-zshrc.sh`
-- Tests: `pytest -q` (daemon) + `zsh tests/smoke.zsh` (plugin logic) +
+- Enable plugin: `scripts/apply-to-zshrc.sh` (or install as a plugin-manager
+  plugin via the root `git-ai-commit.plugin.zsh` loader)
+- Diagnose: `scripts/doctor.sh` (one-command self-check)
+- Tests: `make test` runs everything below —
+  `pytest -q` (daemon) + `zsh tests/smoke.zsh` (plugin logic) +
   `zsh tests/interactive.zsh` (plugin load in a real ZLE) +
+  `bash tests/e2e-workflow.sh` (cross-env: plugin-manager load, ZLE,
+  real daemon+worker vs mock LLM, lazy daemon auto-start) +
   `bash tests/integration.sh` (real processes vs mock LLM)
+- CI: `.github/workflows/ci.yml` runs all tests on Ubuntu + macOS and
+  Python 3.10/3.11/3.12 for every PR.
 - Lint: `ruff check` (if present); keep Python 3.10+ compatible.
 
 ## Do NOT

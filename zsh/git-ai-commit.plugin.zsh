@@ -15,10 +15,18 @@ zmodload zsh/zpty 2>/dev/null || {
 # ---------------------------------------------------------------------------
 # Config (ADR-0010): env overrides file overrides defaults.
 # ---------------------------------------------------------------------------
-typeset -g AI_WORKER_SCRIPT="${0:A:h}/../bin/worker.py"
+# Plugin directory, captured at load time. IMPORTANT: inside a zsh FUNCTION
+# $0 is the function name, not the file path, so we snapshot the plugin's
+# directory here (top-level, where $0 is the file) and reuse it below.
+typeset -g AI_PLUGIN_DIR="${0:A:h}"
+typeset -g AI_WORKER_SCRIPT="${AI_PLUGIN_DIR}/../bin/worker.py"
+AI_WORKER_SCRIPT="${AI_WORKER_SCRIPT:a}"
 typeset -g AI_PTY_NAME="git_ai_commit_worker"
 typeset -g AI_HIGHLIGHT_STYLE="${GIT_AI_HIGHLIGHT_STYLE:-fg=244}"
 typeset -g AI_TRIGGER="${GIT_AI_TRIGGER:-space}"   # space | keystroke | manual
+typeset -g AI_AUTOSTART="${GIT_AI_AUTOSTART:-1}"   # 1 => lazily start the daemon
+typeset -g AI_SOCKET_PATH="${GIT_AI_SOCKET_PATH:-${XDG_RUNTIME_DIR:-/tmp/git-ai-commit-$(id -u)}/daemon.sock}"
+typeset -g AI_PYTHON="${GIT_AI_PYTHON:-}"          # explicit python for daemon/worker; empty => auto
 
 # ---------------------------------------------------------------------------
 # State (typeset -g so it survives widget invocations within the shell).
@@ -60,6 +68,76 @@ fi
 
 # Stub so callers/tests can read readiness.
 _ai_ready() { (( AI_ENABLED )) }
+
+# ---------------------------------------------------------------------------
+# Daemon health check + lazy auto-start.
+#
+# The single most common "it's not working" cause is a missing daemon: the
+# worker then returns `status: "error"` ("daemon unreachable") and no ghost
+# text ever appears. By default the plugin starts the daemon once, in the
+# background, on load — so no separate manual terminal is needed.
+#
+# Non-blocking: spawning uses nohup + `&!` and runs at plugin load, never
+# inside a widget (rule 1). Set GIT_AI_AUTOSTART=0 to disable and manage the
+# daemon yourself.
+# ---------------------------------------------------------------------------
+# A socket FILE can be stale (created by a daemon that later died). So we
+# treat it as "running" only if something is actually accepting connections
+# on it — otherwise _ai_ensure_daemon will start a fresh daemon (which, on
+# startup, unlinks the stale file per its own logic). Uses one fast python
+# connect; runs at plugin load, never inside a widget (rule 1).
+_ai_daemon_running() {
+  [[ -S "$AI_SOCKET_PATH" ]] || return 1
+  local py
+  py="$(_ai_python)"
+  "$py" - "$AI_SOCKET_PATH" <<'PY' >/dev/null 2>&1
+import socket, sys
+try:
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.settimeout(0.5)
+    s.connect(sys.argv[1])
+    s.close()
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+PY
+}
+
+_ai_python() {
+  # Prefer an explicit GIT_AI_PYTHON, then a project venv, then system python3.
+  if [[ -n "$AI_PYTHON" ]]; then
+    print -r -- "$AI_PYTHON"
+  elif [[ -x "$AI_PLUGIN_DIR/../.venv/bin/python" ]]; then
+    print -r -- "$AI_PLUGIN_DIR/../.venv/bin/python"
+  elif command -v python3 >/dev/null 2>&1; then
+    print -r -- "python3"
+  else
+    print -r -- "python"
+  fi
+}
+
+_ai_ensure_daemon() {
+  (( AI_AUTOSTART )) || return 0
+  _ai_daemon_running && return 0
+  local py repo_root
+  py="$(_ai_python)"
+  repo_root="${AI_PLUGIN_DIR}/.."
+  # Fire-and-forget: launch the daemon fully detached (nohup + &! disown) so
+  # it survives the shell exiting and is shared across shells, and so it does
+  # not hold the terminal open. PYTHONPATH points at the repo's src/ so no
+  # `pip install` is required — the daemon resolves git_ai_commit from source.
+  (
+    cd "$repo_root"
+    PYTHONPATH="$repo_root/src${PYTHONPATH:+:$PYTHONPATH}" \
+      nohup "$py" -m git_ai_commit.daemon >/dev/null 2>&1 &!
+  ) 2>/dev/null
+}
+
+# Only auto-start when ZLE is live (interactive shell).
+if [[ -o interactive ]] && (( AI_ENABLED )); then
+  _ai_ensure_daemon
+fi
+
 
 # ---------------------------------------------------------------------------
 # Context detection (docs/03 §3): only inside an OPEN -m "…" on `git commit`,
