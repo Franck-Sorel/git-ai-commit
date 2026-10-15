@@ -33,14 +33,18 @@ def verify_peer_uid(sock: socket.socket, expected_uid: int) -> bool:
     elif sys.platform == "darwin":
         # struct xucred { uint cr_version; uid_t cr_uid; ... }
         # Read only the first two scalar fields off the front, which are
-        # layout-stable across known xucred variants.
+        # layout-stable across known xucred variants. A short buffer (e.g.
+        # a non-AF_UNIX socket) would make struct.unpack raise struct.error,
+        # so fail closed on both OSError and struct.error.
         LOCAL_PEERCRED = 0x001  # from <sys/ucred.h>; verify vs target SDK
         try:
             SOL_LOCAL = 0
             raw = sock.getsockopt(SOL_LOCAL, LOCAL_PEERCRED, 8)
+            if len(raw) < 8:
+                return False
             _version, uid = struct.unpack("Ii", raw)
             return uid == expected_uid
-        except OSError:
+        except (OSError, struct.error):
             return False
 
     else:

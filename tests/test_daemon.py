@@ -17,6 +17,14 @@ from git_ai_commit.config import Config
 from git_ai_commit.daemon import Daemon, DiffCache
 
 
+def _short_sock(name: str) -> str:
+    # macOS caps AF_UNIX paths at ~104 bytes; tmp_path lives under the long
+    # /var/folders/... tree, so a socket there would raise "AF_UNIX path too
+    # long". Use a short path in the CWD (repo checkout) instead, which stays
+    # well under the limit on every runner.
+    return str(Path.cwd() / f"_gai_{name}.sock")
+
+
 # --------------------------------------------------------------------------- DiffCache
 def _make_repo(root: Path, filename: str, content: str) -> Path:
     subprocess.run(["git", "init", "-q", str(root)], check=True)
@@ -87,7 +95,7 @@ async def _start_mock_llm(port):
 @pytest.mark.asyncio
 async def test_end_to_end_suggestion(tmp_path):
     runner, port = await _start_mock_llm(0)
-    sock_path = tmp_path / "d.sock"
+    sock_path = Path(_short_sock("e2e"))
     cfg = Config(socket_path=str(sock_path), debounce_ms=0,
                  llama_url=f"http://127.0.0.1:{port}/v1/completions")
     daemon = Daemon(cfg)
@@ -107,13 +115,14 @@ async def test_end_to_end_suggestion(tmp_path):
         await writer.wait_closed()
     finally:
         await _teardown(daemon, server, runner)
+        sock_path.unlink(missing_ok=True)
 
 
 @pytest.mark.asyncio
 async def test_stale_request_discarded(tmp_path):
     """A request superseded during debounce must not produce a response."""
     runner, port = await _start_mock_llm(0)
-    sock_path = tmp_path / "e.sock"
+    sock_path = Path(_short_sock("stale"))
     cfg = Config(socket_path=str(sock_path), debounce_ms=200,
                  llama_url=f"http://127.0.0.1:{port}/v1/completions")
     daemon = Daemon(cfg)
@@ -145,3 +154,4 @@ async def test_stale_request_discarded(tmp_path):
         await w1.wait_closed(); await w2.wait_closed()
     finally:
         await _teardown(daemon, server, runner)
+        sock_path.unlink(missing_ok=True)
