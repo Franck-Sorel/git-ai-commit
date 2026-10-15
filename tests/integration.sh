@@ -50,7 +50,10 @@ echo "$RESP" | grep -q '"status": "ok"' || { echo "FAIL: no ok status"; exit 1; 
 echo "$RESP" | grep -q 'login validation' || { echo "FAIL: unexpected suggestion"; exit 1; }
 
 echo "== security: socket permissions are 0600"
-perm="$(stat -c '%a' "$SOCK_PATH")"
+case "$(uname -s)" in
+  Darwin) perm="$(stat -f '%Lp' "$SOCK_PATH")" ;;
+  *)      perm="$(stat -c '%a' "$SOCK_PATH")" ;;
+esac
 [[ "$perm" == "600" || "$perm" == "0600" ]] || { echo "FAIL: socket perm $perm != 600"; exit 1; }
 echo "   socket perm: $perm"
 
